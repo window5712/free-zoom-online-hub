@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import { Mic, MicOff, Video, VideoOff, Phone, Users, MessageSquare, ScreenShare, ScreenShareOff } from "lucide-react";
@@ -11,9 +11,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import MeetingParticipant from "@/components/MeetingParticipant";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 const MeetingRoom = () => {
   const { meetingId } = useParams();
+  const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -22,61 +26,63 @@ const MeetingRoom = () => {
   const [messages, setMessages] = useState<Array<{sender: string, text: string, time: string}>>([]);
   const [newMessage, setNewMessage] = useState("");
   const [participants, setParticipants] = useState<Array<{id: string, name: string}>>([]);
-  const [userName, setUserName] = useState("");
+  const [meeting, setMeeting] = useState<any>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
+  
+  // Check authentication and fetch meeting
+  useEffect(() => {
+    if (!user) {
+      toast.error("Please sign in to join the meeting");
+      navigate("/auth");
+      return;
+    }
+    
+    const fetchMeeting = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("meetings")
+          .select("*")
+          .eq("meeting_id", meetingId)
+          .single();
+          
+        if (error || !data) {
+          toast.error("Meeting not found");
+          navigate("/");
+          return;
+        }
+        
+        setMeeting(data);
+        
+        // Insert attendance record
+        await supabase
+          .from("attendance")
+          .insert([{
+            meeting_id: data.id,
+            user_id: user.id,
+            join_time: new Date().toISOString()
+          }])
+          .select();
+          
+      } catch (error) {
+        console.error("Error fetching meeting:", error);
+        toast.error("Error loading meeting details");
+      }
+    };
+    
+    fetchMeeting();
+  }, [meetingId, user, navigate]);
 
   // Mock participants for demo
   useEffect(() => {
+    if (!user) return;
+    
     const mockParticipants = [
       { id: "user-1", name: "Alex Johnson" },
       { id: "user-2", name: "Sarah Miller" },
       { id: "user-3", name: "Dave Wilson" },
     ];
     setParticipants([...mockParticipants]);
-
-    // Get user name from local storage
-    const storedUserName = localStorage.getItem("userName") || "You";
-    setUserName(storedUserName);
-
-    // Save attendance record
-    const meetingData = JSON.parse(localStorage.getItem("meetingAttendance") || "{}");
-    const currentDate = new Date().toISOString().split('T')[0];
-    const currentTime = new Date().toLocaleTimeString();
-    
-    if (!meetingData[meetingId]) {
-      meetingData[meetingId] = {
-        meetingId,
-        date: currentDate,
-        startTime: currentTime,
-        participants: [{
-          name: storedUserName,
-          joinTime: currentTime,
-          leaveTime: null
-        }]
-      };
-    } else {
-      meetingData[meetingId].participants.push({
-        name: storedUserName,
-        joinTime: currentTime,
-        leaveTime: null
-      });
-    }
-    
-    localStorage.setItem("meetingAttendance", JSON.stringify(meetingData));
-
-    // Record attendance for mock participants
-    setTimeout(() => {
-      const updatedMeetingData = JSON.parse(localStorage.getItem("meetingAttendance") || "{}");
-      mockParticipants.forEach(participant => {
-        updatedMeetingData[meetingId].participants.push({
-          name: participant.name,
-          joinTime: new Date().toLocaleTimeString(),
-          leaveTime: null
-        });
-      });
-      localStorage.setItem("meetingAttendance", JSON.stringify(updatedMeetingData));
-    }, 3000);
 
     // Setup camera access
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -96,16 +102,23 @@ const MeetingRoom = () => {
     // Clean up on unmount
     return () => {
       // Record leave time when leaving the meeting
-      const finalMeetingData = JSON.parse(localStorage.getItem("meetingAttendance") || "{}");
-      if (finalMeetingData[meetingId]) {
-        const userEntry = finalMeetingData[meetingId].participants.find(
-          (p: any) => p.name === storedUserName && !p.leaveTime
-        );
-        if (userEntry) {
-          userEntry.leaveTime = new Date().toLocaleTimeString();
-        }
-        finalMeetingData[meetingId].endTime = new Date().toLocaleTimeString();
-        localStorage.setItem("meetingAttendance", JSON.stringify(finalMeetingData));
+      if (user && meeting) {
+        const updateAttendance = async () => {
+          try {
+            await supabase
+              .from("attendance")
+              .update({
+                leave_time: new Date().toISOString()
+              })
+              .eq("meeting_id", meeting.id)
+              .eq("user_id", user.id)
+              .is("leave_time", null);
+          } catch (error) {
+            console.error("Error updating attendance record:", error);
+          }
+        };
+        
+        updateAttendance();
       }
 
       // Stop all media streams
@@ -118,7 +131,7 @@ const MeetingRoom = () => {
         tracks.forEach(track => track.stop());
       }
     };
-  }, [meetingId]);
+  }, [user, meeting]);
 
   const toggleAudio = () => {
     setIsAudioEnabled(!isAudioEnabled);
@@ -178,20 +191,27 @@ const MeetingRoom = () => {
   };
 
   const endCall = () => {
-    // Record leave time when ending the call
-    const finalMeetingData = JSON.parse(localStorage.getItem("meetingAttendance") || "{}");
-    if (finalMeetingData[meetingId]) {
-      const userEntry = finalMeetingData[meetingId].participants.find(
-        (p: any) => p.name === userName && !p.leaveTime
-      );
-      if (userEntry) {
-        userEntry.leaveTime = new Date().toLocaleTimeString();
-      }
-      finalMeetingData[meetingId].endTime = new Date().toLocaleTimeString();
-      localStorage.setItem("meetingAttendance", JSON.stringify(finalMeetingData));
+    // Update attendance record when ending the call
+    if (user && meeting) {
+      const updateAttendance = async () => {
+        try {
+          await supabase
+            .from("attendance")
+            .update({
+              leave_time: new Date().toISOString()
+            })
+            .eq("meeting_id", meeting.id)
+            .eq("user_id", user.id)
+            .is("leave_time", null);
+        } catch (error) {
+          console.error("Error updating attendance record:", error);
+        }
+      };
+      
+      updateAttendance();
     }
     
-    window.location.href = "/";
+    navigate("/meetings");
   };
 
   const sendMessage = (e: React.FormEvent) => {
@@ -200,7 +220,7 @@ const MeetingRoom = () => {
     
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const message = {
-      sender: userName,
+      sender: profile?.username || user?.email || "You",
       text: newMessage,
       time
     };
@@ -229,14 +249,26 @@ const MeetingRoom = () => {
     }, 2000 + Math.random() * 3000);
   };
 
+  if (!user || !meeting) {
+    return (
+      <Layout className="bg-zoom-gray">
+        <div className="container mx-auto px-4 py-6 flex flex-col h-[calc(100vh-4rem)]">
+          <div className="flex items-center justify-center h-full">
+            <p>Loading meeting...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout className="bg-zoom-gray">
       <div className="container mx-auto px-4 py-6 flex flex-col h-[calc(100vh-4rem)]">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-lg font-semibold">Meeting: {meetingId}</h1>
+            <h1 className="text-lg font-semibold">{meeting.title || `Meeting: ${meetingId}`}</h1>
             <p className="text-sm text-muted-foreground">
-              {new Date().toLocaleDateString()} · {participants.length + 1} participants
+              {new Date(meeting.created_at).toLocaleDateString()} · {participants.length + 1} participants
             </p>
           </div>
           <div className="flex gap-2">
@@ -278,12 +310,12 @@ const MeetingRoom = () => {
               {!isVideoEnabled && (
                 <div className="w-full h-full flex items-center justify-center bg-gray-800">
                   <div className="w-16 h-16 rounded-full bg-zoom-blue flex items-center justify-center text-white text-xl font-semibold">
-                    {userName.charAt(0).toUpperCase()}
+                    {profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'Y'}
                   </div>
                 </div>
               )}
               <div className="participant-name">
-                {userName} {!isAudioEnabled && "(Muted)"}
+                {profile?.username || user?.email || "You"} {!isAudioEnabled && "(Muted)"}
               </div>
             </div>
             
@@ -328,8 +360,10 @@ const MeetingRoom = () => {
                       </div>
                       <div className="space-y-2">
                         <div className="py-2 px-3 bg-zinc-100 rounded-sm flex items-center justify-between">
-                          <span>{userName} (You)</span>
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Host</span>
+                          <span>{profile?.username || user?.email || "You"} (You)</span>
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                            {meeting.created_by === user.id ? "Host" : "Participant"}
+                          </span>
                         </div>
                         {participants.map((participant) => (
                           <div key={participant.id} className="py-2 px-3 hover:bg-zinc-50 rounded-sm">
@@ -351,13 +385,13 @@ const MeetingRoom = () => {
                         messages.map((message, idx) => (
                           <div key={idx} className={cn(
                             "p-3 rounded-lg max-w-[80%]",
-                            message.sender === userName 
+                            message.sender === (profile?.username || user?.email || "You")
                               ? "bg-zoom-blue text-white ml-auto" 
                               : "bg-zinc-100"
                           )}>
                             <div className="flex justify-between items-baseline mb-1">
                               <span className="font-medium text-xs">
-                                {message.sender === userName ? "You" : message.sender}
+                                {message.sender === (profile?.username || user?.email || "You") ? "You" : message.sender}
                               </span>
                               <span className="text-xs opacity-70">{message.time}</span>
                             </div>
@@ -405,13 +439,13 @@ const MeetingRoom = () => {
                   messages.map((message, idx) => (
                     <div key={idx} className={cn(
                       "p-3 rounded-lg max-w-[80%]",
-                      message.sender === userName 
+                      message.sender === (profile?.username || user?.email || "You")
                         ? "bg-zoom-blue text-white ml-auto" 
                         : "bg-zinc-100"
                     )}>
                       <div className="flex justify-between items-baseline mb-1">
                         <span className="font-medium text-xs">
-                          {message.sender === userName ? "You" : message.sender}
+                          {message.sender === (profile?.username || user?.email || "You") ? "You" : message.sender}
                         </span>
                         <span className="text-xs opacity-70">{message.time}</span>
                       </div>
@@ -449,8 +483,10 @@ const MeetingRoom = () => {
               </div>
               <div className="space-y-2">
                 <div className="py-2 px-3 bg-zinc-100 rounded-sm flex items-center justify-between">
-                  <span>{userName} (You)</span>
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Host</span>
+                  <span>{profile?.username || user?.email || "You"} (You)</span>
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                    {meeting.created_by === user.id ? "Host" : "Participant"}
+                  </span>
                 </div>
                 {participants.map((participant) => (
                   <div key={participant.id} className="py-2 px-3 hover:bg-zinc-50 rounded-sm">

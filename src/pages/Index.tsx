@@ -7,52 +7,89 @@ import Layout from "@/components/Layout";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Video, Users, Calendar } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [meetingCode, setMeetingCode] = React.useState("");
   const [userName, setUserName] = React.useState("");
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
 
-  const handleJoinMeeting = (e: React.FormEvent) => {
+  const handleJoinMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      toast.error("Please sign in to join a meeting");
+      navigate("/auth");
+      return;
+    }
+    
     if (!meetingCode.trim()) {
       toast.error("Please enter a meeting code");
       return;
     }
     
-    if (!userName.trim()) {
-      toast.error("Please enter your name");
-      return;
+    try {
+      // Check if meeting exists
+      const { data: meeting, error } = await supabase
+        .from("meetings")
+        .select("*")
+        .eq("meeting_id", meetingCode)
+        .single();
+        
+      if (error || !meeting) {
+        toast.error("Meeting not found");
+        return;
+      }
+      
+      // Navigate to meeting room
+      navigate(`/meeting/${meetingCode}`);
+    } catch (error) {
+      console.error("Error joining meeting:", error);
+      toast.error("Failed to join meeting");
     }
-    
-    // Store username in localStorage
-    localStorage.setItem("userName", userName);
-    
-    // Navigate to meeting room
-    navigate(`/meeting/${meetingCode}`);
   };
 
-  const handleCreateMeeting = () => {
-    if (!userName.trim()) {
-      toast.error("Please enter your name");
+  const handleCreateMeeting = async () => {
+    if (!user) {
+      toast.error("Please sign in to create a meeting");
+      navigate("/auth");
       return;
     }
     
-    // Store username in localStorage
-    localStorage.setItem("userName", userName);
-    
-    // Create a random meeting ID
-    const meetingId = Math.random().toString(36).substring(2, 12);
-    navigate(`/meeting/${meetingId}`);
+    try {
+      // Create a random meeting ID
+      const meetingId = Math.random().toString(36).substring(2, 12);
+      
+      // Insert meeting into database
+      const { data, error } = await supabase
+        .from("meetings")
+        .insert([
+          {
+            meeting_id: meetingId,
+            title: `${profile?.username || user.email}'s Meeting`,
+            created_by: user.id,
+            description: "A ZoomFree meeting"
+          }
+        ])
+        .select();
+        
+      if (error) throw error;
+      
+      toast.success("Meeting created successfully");
+      navigate(`/meeting/${meetingId}`);
+    } catch (error) {
+      console.error("Error creating meeting:", error);
+      toast.error("Failed to create meeting");
+    }
   };
 
   React.useEffect(() => {
-    // Load username from localStorage if available
-    const savedUserName = localStorage.getItem("userName");
-    if (savedUserName) {
-      setUserName(savedUserName);
+    if (profile) {
+      setUserName(profile.full_name || profile.username || user?.email || "");
     }
-  }, []);
+  }, [profile, user]);
 
   return (
     <Layout>
@@ -67,31 +104,44 @@ const Index = () => {
             </p>
             <div className="flex flex-col space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
               <form onSubmit={handleJoinMeeting} className="flex w-full flex-col space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0">
-                <Input
-                  placeholder="Enter your name"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  className="sm:max-w-[200px]"
-                  required
-                />
-                <Input
-                  placeholder="Enter meeting code"
-                  value={meetingCode}
-                  onChange={(e) => setMeetingCode(e.target.value)}
-                  className="flex-1"
-                  required
-                />
-                <Button type="submit" className="bg-zoom-blue hover:bg-zoom-darkBlue">Join Meeting</Button>
+                {!user && (
+                  <Button 
+                    onClick={() => navigate("/auth")} 
+                    variant="default" 
+                    className="sm:w-auto"
+                    type="button"
+                  >
+                    Sign In to Get Started
+                  </Button>
+                )}
+                
+                {user && (
+                  <>
+                    <Input
+                      placeholder="Enter meeting code"
+                      value={meetingCode}
+                      onChange={(e) => setMeetingCode(e.target.value)}
+                      className="flex-1"
+                      required
+                    />
+                    <Button type="submit" className="bg-zoom-blue hover:bg-zoom-darkBlue">Join Meeting</Button>
+                  </>
+                )}
               </form>
             </div>
-            <div className="flex items-center">
-              <div className="h-px flex-1 bg-border"></div>
-              <span className="px-2 text-muted-foreground">or</span>
-              <div className="h-px flex-1 bg-border"></div>
-            </div>
-            <Button onClick={handleCreateMeeting} variant="secondary" className="w-full sm:w-auto">
-              Create New Meeting
-            </Button>
+            
+            {user && (
+              <>
+                <div className="flex items-center">
+                  <div className="h-px flex-1 bg-border"></div>
+                  <span className="px-2 text-muted-foreground">or</span>
+                  <div className="h-px flex-1 bg-border"></div>
+                </div>
+                <Button onClick={handleCreateMeeting} variant="secondary" className="w-full sm:w-auto">
+                  Create New Meeting
+                </Button>
+              </>
+            )}
           </div>
           <div className="flex items-center justify-center">
             <img
