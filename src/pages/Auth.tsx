@@ -93,155 +93,159 @@ const Auth = () => {
         </div>
         
         <Card>
-          <CardHeader>
-            <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <CardHeader>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="register">Register</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="login" className="mt-4">
-                <CardTitle>Welcome back</CardTitle>
-                <CardDescription>Sign in to your account to continue</CardDescription>
+              <div className="mt-4">
+                {activeTab === "login" ? (
+                  <>
+                    <CardTitle>Welcome back</CardTitle>
+                    <CardDescription>Sign in to your account to continue</CardDescription>
+                  </>
+                ) : (
+                  <>
+                    <CardTitle>Create an account</CardTitle>
+                    <CardDescription>Enter your details to register</CardDescription>
+                  </>
+                )}
+              </div>
+            </CardHeader>
+            
+            <CardContent>
+              <TabsContent value="login" className="mt-0">
+                <Form {...loginForm}>
+                  <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
+                    <FormField
+                      control={loginForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="you@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={loginForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="w-full" disabled={loginForm.formState.isSubmitting}>
+                      {loginForm.formState.isSubmitting ? "Signing in..." : "Sign in"}
+                    </Button>
+                  </form>
+                </Form>
+                <p className="mt-4 text-sm text-center text-gray-600">
+                  Don't have an account?{" "}
+                  <button
+                    onClick={() => setActiveTab("register")}
+                    className="text-zoom-blue hover:underline"
+                  >
+                    Register
+                  </button>
+                </p>
               </TabsContent>
               
-              <TabsContent value="register" className="mt-4">
-                <CardTitle>Create an account</CardTitle>
-                <CardDescription>Enter your details to register</CardDescription>
+              <TabsContent value="register" className="mt-0">
+                <Form {...registerForm}>
+                  <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
+                    <FormField
+                      control={registerForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="you@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
+                      name="fullName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Username
+                            <HoverCard>
+                              <HoverCardTrigger asChild>
+                                <span className="ml-1 text-xs text-blue-500 cursor-help">[?]</span>
+                              </HoverCardTrigger>
+                              <HoverCardContent className="w-80">
+                                <p className="text-sm">
+                                  Username can only contain letters, numbers, underscores, and hyphens.
+                                  It will be visible to other users.
+                                </p>
+                              </HoverCardContent>
+                            </HoverCard>
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="johndoe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="w-full" disabled={registerForm.formState.isSubmitting}>
+                      {registerForm.formState.isSubmitting ? "Registering..." : "Register"}
+                    </Button>
+                  </form>
+                </Form>
+                <p className="mt-4 text-sm text-center text-gray-600">
+                  Already have an account?{" "}
+                  <button
+                    onClick={() => setActiveTab("login")}
+                    className="text-zoom-blue hover:underline"
+                  >
+                    Sign in
+                  </button>
+                </p>
               </TabsContent>
-            </Tabs>
-          </CardHeader>
-          
-          <CardContent>
-            <TabsContent value="login" className="mt-0">
-              <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
-                  <FormField
-                    control={loginForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={loginForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full" disabled={loginForm.formState.isSubmitting}>
-                    {loginForm.formState.isSubmitting ? "Signing in..." : "Sign in"}
-                  </Button>
-                </form>
-              </Form>
-              <p className="mt-4 text-sm text-center text-gray-600">
-                Don't have an account?{" "}
-                <button
-                  onClick={() => setActiveTab("register")}
-                  className="text-zoom-blue hover:underline"
-                >
-                  Register
-                </button>
-              </p>
-            </TabsContent>
-            
-            <TabsContent value="register" className="mt-0">
-              <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                  <FormField
-                    control={registerForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={registerForm.control}
-                    name="fullName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={registerForm.control}
-                    name="username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Username
-                          <HoverCard>
-                            <HoverCardTrigger asChild>
-                              <span className="ml-1 text-xs text-blue-500 cursor-help">[?]</span>
-                            </HoverCardTrigger>
-                            <HoverCardContent className="w-80">
-                              <p className="text-sm">
-                                Username can only contain letters, numbers, underscores, and hyphens.
-                                It will be visible to other users.
-                              </p>
-                            </HoverCardContent>
-                          </HoverCard>
-                        </FormLabel>
-                        <FormControl>
-                          <Input placeholder="johndoe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={registerForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full" disabled={registerForm.formState.isSubmitting}>
-                    {registerForm.formState.isSubmitting ? "Registering..." : "Register"}
-                  </Button>
-                </form>
-              </Form>
-              <p className="mt-4 text-sm text-center text-gray-600">
-                Already have an account?{" "}
-                <button
-                  onClick={() => setActiveTab("login")}
-                  className="text-zoom-blue hover:underline"
-                >
-                  Sign in
-                </button>
-              </p>
-            </TabsContent>
-          </CardContent>
+            </CardContent>
+          </Tabs>
         </Card>
       </div>
     </div>
