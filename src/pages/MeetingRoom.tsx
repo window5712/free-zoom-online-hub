@@ -1,28 +1,38 @@
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
 import useMeetingMedia from "@/hooks/useMeetingMedia";
+import { useMeetingData } from "@/hooks/useMeetingData";
+import { useMeetingUI } from "@/hooks/useMeetingUI";
 import VideoDisplay from "@/components/meeting/VideoDisplay";
 import MeetingControls from "@/components/meeting/MeetingControls";
 import MeetingSidebar from "@/components/meeting/MeetingSidebar";
 import MeetingMobileDialogs from "@/components/meeting/MeetingMobileDialogs";
+import MeetingHeader from "@/components/meeting/MeetingHeader";
 
 const MeetingRoom = () => {
   const { meetingId } = useParams();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
-  const [isParticipantListOpen, setIsParticipantListOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"participants" | "chat">("participants");
-  const [messages, setMessages] = useState<Array<{sender: string, text: string, time: string}>>([]);
-  const [participants, setParticipants] = useState<Array<{id: string, name: string}>>([]);
-  const [meeting, setMeeting] = useState<any>(null);
+  
+  const {
+    meeting,
+    participants,
+    messages,
+    setMessages,
+    leaveAttendance
+  } = useMeetingData(meetingId);
+  
+  const {
+    isParticipantListOpen,
+    setIsParticipantListOpen,
+    isChatOpen,
+    setIsChatOpen,
+    activeTab,
+    setActiveTab,
+    handleTabChange
+  } = useMeetingUI();
   
   const {
     isAudioEnabled,
@@ -34,157 +44,14 @@ const MeetingRoom = () => {
     toggleVideo,
     toggleScreenShare
   } = useMeetingMedia();
-  
-  // Check authentication and fetch meeting
-  useEffect(() => {
-    if (!user) {
-      toast.error("Please sign in to join the meeting");
-      navigate("/auth");
-      return;
-    }
-    
-    const fetchMeeting = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("meetings")
-          .select("*")
-          .eq("meeting_id", meetingId)
-          .single();
-          
-        if (error || !data) {
-          toast.error("Meeting not found");
-          navigate("/");
-          return;
-        }
-        
-        setMeeting(data);
-        
-        // Insert attendance record
-        await supabase
-          .from("attendance")
-          .insert([{
-            meeting_id: data.id,
-            user_id: user.id,
-            join_time: new Date().toISOString()
-          }])
-          .select();
-          
-      } catch (error) {
-        console.error("Error fetching meeting:", error);
-        toast.error("Error loading meeting details");
-      }
-    };
-    
-    fetchMeeting();
-  }, [meetingId, user, navigate]);
 
-  // Setup real-time listener for meeting participants
-  useEffect(() => {
-    if (!meeting) return;
-    
-    // Fetch current participants
-    const fetchParticipants = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("attendance")
-          .select("user_id, leave_time, profiles:user_id(username, full_name)")
-          .eq("meeting_id", meeting.id)
-          .is("leave_time", null); // Only active participants (not left)
-          
-        if (error) throw error;
-        
-        // Filter out current user and map to format needed by components
-        const activeParticipants = data
-          .filter(p => p.user_id !== user?.id) // Don't include current user
-          .map(p => ({
-            id: p.user_id,
-            name: p.profiles.username || p.profiles.full_name || "Anonymous User"
-          }));
-          
-        setParticipants(activeParticipants);
-      } catch (error) {
-        console.error("Error fetching participants:", error);
-      }
-    };
-    
-    fetchParticipants();
-    
-    // Set up realtime subscription for attendance changes
-    const channel = supabase
-      .channel('public:attendance')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'attendance',
-        filter: `meeting_id=eq.${meeting.id}`
-      }, () => {
-        // When attendance changes, refresh participants
-        fetchParticipants();
-      })
-      .subscribe();
-      
-    // Record leave time when leaving the meeting
-    return () => {
-      if (user && meeting) {
-        const updateAttendance = async () => {
-          try {
-            await supabase
-              .from("attendance")
-              .update({
-                leave_time: new Date().toISOString()
-              })
-              .eq("meeting_id", meeting.id)
-              .eq("user_id", user.id)
-              .is("leave_time", null);
-          } catch (error) {
-            console.error("Error updating attendance record:", error);
-          }
-        };
-        
-        updateAttendance();
-      }
-      
-      // Clean up the subscription
-      supabase.removeChannel(channel);
-    };
-  }, [meeting, user]);
-
-  const handleTabChange = (tab: "participants" | "chat") => {
-    setActiveTab(tab);
-    if (tab === "participants") {
-      setIsParticipantListOpen(true);
-      setIsChatOpen(false);
-    } else {
-      setIsChatOpen(true);
-      setIsParticipantListOpen(false);
-    }
-  };
-
-  const endCall = () => {
-    // Update attendance record when ending the call
-    if (user && meeting) {
-      const updateAttendance = async () => {
-        try {
-          await supabase
-            .from("attendance")
-            .update({
-              leave_time: new Date().toISOString()
-            })
-            .eq("meeting_id", meeting.id)
-            .eq("user_id", user.id)
-            .is("leave_time", null);
-        } catch (error) {
-          console.error("Error updating attendance record:", error);
-        }
-      };
-      
-      updateAttendance();
-    }
-    
+  const endCall = async () => {
+    await leaveAttendance();
     navigate("/meetings");
   };
 
-  if (!user || !meeting) {
+  // Show loading state if meeting data is not yet loaded
+  if (!meeting) {
     return (
       <Layout className="bg-zoom-gray">
         <div className="container mx-auto px-4 py-6 flex flex-col h-[calc(100vh-4rem)]">
@@ -199,26 +66,11 @@ const MeetingRoom = () => {
   return (
     <Layout className="bg-zoom-gray">
       <div className="container mx-auto px-4 py-6 flex flex-col h-[calc(100vh-4rem)]">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-lg font-semibold">{meeting.title || `Meeting: ${meetingId}`}</h1>
-            <p className="text-sm text-muted-foreground">
-              {new Date(meeting.created_at).toLocaleDateString()} · {participants.length + 1} participants
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                toast.success("Meeting link copied to clipboard");
-              }}
-            >
-              Copy meeting link
-            </Button>
-          </div>
-        </div>
+        <MeetingHeader 
+          title={meeting.title || `Meeting: ${meetingId}`}
+          createdAt={meeting.created_at}
+          participantCount={participants.length + 1}
+        />
 
         <div className="flex-grow flex gap-4 overflow-hidden">
           {/* Main content: video grid */}

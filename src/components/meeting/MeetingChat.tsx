@@ -5,17 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-
-interface ChatMessage {
-  sender: string;
-  text: string;
-  time: string;
-}
+import { Participant, Message } from "@/hooks/useMeetingData";
 
 interface MeetingChatProps {
-  messages: ChatMessage[];
-  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
-  participants: Array<{id: string, name: string}>;
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  participants: Participant[];
 }
 
 const MeetingChat: React.FC<MeetingChatProps> = ({ messages, setMessages, participants }) => {
@@ -35,26 +30,6 @@ const MeetingChat: React.FC<MeetingChatProps> = ({ messages, setMessages, partic
     
     setMessages([...messages, message]);
     setNewMessage("");
-    
-    // Mock response from another participant
-    setTimeout(() => {
-      const randomParticipant = participants[Math.floor(Math.random() * participants.length)];
-      const responseTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const mockResponses = [
-        "I agree with that point.",
-        "Could you explain more?",
-        "That's an interesting perspective.",
-        "Let's move to the next topic.",
-        "I have a question about that."
-      ];
-      const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-      
-      setMessages(prevMessages => [...prevMessages, {
-        sender: randomParticipant.name,
-        text: randomResponse,
-        time: responseTime
-      }]);
-    }, 2000 + Math.random() * 3000);
   };
   
   return (
