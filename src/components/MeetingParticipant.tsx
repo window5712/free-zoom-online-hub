@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { MicOff } from "lucide-react";
 
@@ -11,22 +11,11 @@ interface MeetingParticipantProps {
 
 const MeetingParticipant = ({ 
   name, 
-  isAudioMuted = Math.random() > 0.5, // Randomly muted for demo purposes
+  isAudioMuted = true, // Default to muted for now
   className 
 }: MeetingParticipantProps) => {
-  const [hasVideo, setHasVideo] = useState(Math.random() > 0.3); // 70% chance of having video on
+  const [hasVideo, setHasVideo] = useState(false); // Default to no video
   
-  // For demonstration, randomly toggle video on/off every 20-40 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.8) {
-        setHasVideo(prev => !prev);
-      }
-    }, 20000 + Math.random() * 20000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <div className={cn("video-container", className)}>
       {hasVideo ? (

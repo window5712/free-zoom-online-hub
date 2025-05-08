@@ -1,5 +1,5 @@
 
-import React, { useRef } from "react";
+import React from "react";
 import { cn } from "@/lib/utils";
 import MeetingParticipant from "@/components/MeetingParticipant";
 import { useAuth } from "@/context/AuthContext";
@@ -51,13 +51,23 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({
         </div>
       </div>
       
-      {/* Participant videos */}
+      {/* Participant videos - only show real participants */}
       {participants.map((participant) => (
         <MeetingParticipant 
           key={participant.id} 
           name={participant.name} 
         />
       ))}
+      
+      {/* If no participants have joined yet */}
+      {participants.length === 0 && (
+        <div className="video-container flex items-center justify-center bg-gray-100">
+          <div className="text-center p-4">
+            <p className="text-lg font-medium text-gray-700">No other participants yet</p>
+            <p className="text-sm text-gray-500 mt-2">Share the meeting link to invite others</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

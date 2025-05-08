@@ -78,17 +78,51 @@ const MeetingRoom = () => {
     fetchMeeting();
   }, [meetingId, user, navigate]);
 
-  // Mock participants for demo
+  // Setup real-time listener for meeting participants
   useEffect(() => {
-    if (!user) return;
+    if (!meeting) return;
     
-    const mockParticipants = [
-      { id: "user-1", name: "Alex Johnson" },
-      { id: "user-2", name: "Sarah Miller" },
-      { id: "user-3", name: "Dave Wilson" },
-    ];
-    setParticipants([...mockParticipants]);
-
+    // Fetch current participants
+    const fetchParticipants = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("attendance")
+          .select("user_id, leave_time, profiles:user_id(username, full_name)")
+          .eq("meeting_id", meeting.id)
+          .is("leave_time", null); // Only active participants (not left)
+          
+        if (error) throw error;
+        
+        // Filter out current user and map to format needed by components
+        const activeParticipants = data
+          .filter(p => p.user_id !== user?.id) // Don't include current user
+          .map(p => ({
+            id: p.user_id,
+            name: p.profiles.username || p.profiles.full_name || "Anonymous User"
+          }));
+          
+        setParticipants(activeParticipants);
+      } catch (error) {
+        console.error("Error fetching participants:", error);
+      }
+    };
+    
+    fetchParticipants();
+    
+    // Set up realtime subscription for attendance changes
+    const channel = supabase
+      .channel('public:attendance')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'attendance',
+        filter: `meeting_id=eq.${meeting.id}`
+      }, () => {
+        // When attendance changes, refresh participants
+        fetchParticipants();
+      })
+      .subscribe();
+      
     // Record leave time when leaving the meeting
     return () => {
       if (user && meeting) {
@@ -109,8 +143,11 @@ const MeetingRoom = () => {
         
         updateAttendance();
       }
+      
+      // Clean up the subscription
+      supabase.removeChannel(channel);
     };
-  }, [user, meeting]);
+  }, [meeting, user]);
 
   const handleTabChange = (tab: "participants" | "chat") => {
     setActiveTab(tab);

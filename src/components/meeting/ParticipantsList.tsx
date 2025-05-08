@@ -15,7 +15,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({ participants, meeti
     <ScrollArea className="h-[calc(100vh-14rem)]">
       <div className="p-4">
         <div className="text-sm font-medium mb-2">
-          Participants ({participants.length + 1})
+          Participants ({participants.length ? participants.length + 1 : 1})
         </div>
         <div className="space-y-2">
           <div className="py-2 px-3 bg-zinc-100 rounded-sm flex items-center justify-between">
@@ -29,6 +29,11 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({ participants, meeti
               {participant.name}
             </div>
           ))}
+          {!participants.length && (
+            <div className="py-2 px-3 text-gray-500 text-sm italic">
+              No other participants have joined yet
+            </div>
+          )}
         </div>
       </div>
     </ScrollArea>
