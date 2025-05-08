@@ -12,15 +12,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft, Download } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 interface Participant {
+  id: string;
   name: string;
   joinTime: string;
   leaveTime: string | null;
 }
 
 interface Meeting {
+  id: string;
   meetingId: string;
+  title: string;
   date: string;
   startTime: string;
   endTime?: string;
@@ -30,18 +36,74 @@ interface Meeting {
 const AttendanceSingle = () => {
   const { meetingId } = useParams();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   useEffect(() => {
-    // Load meeting data from localStorage
-    const storedMeetings = localStorage.getItem("meetingAttendance");
-    if (storedMeetings) {
-      const meetings = JSON.parse(storedMeetings);
-      if (meetingId && meetings[meetingId]) {
-        setMeeting(meetings[meetingId]);
+    const fetchMeetingData = async () => {
+      if (!meetingId) return;
+      
+      setIsLoading(true);
+      try {
+        // Fetch meeting information
+        const { data: meetingData, error: meetingError } = await supabase
+          .from("meetings")
+          .select("*")
+          .eq("id", meetingId)
+          .single();
+        
+        if (meetingError || !meetingData) {
+          toast.error("Meeting not found");
+          navigate("/attendance");
+          return;
+        }
+        
+        // Fetch attendance records for this meeting
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from("attendance")
+          .select(`
+            id, 
+            join_time, 
+            leave_time, 
+            user_id,
+            profiles:user_id (username, full_name)
+          `)
+          .eq("meeting_id", meetingId);
+          
+        if (attendanceError) {
+          console.error("Error fetching attendance:", attendanceError);
+          toast.error("Failed to load attendance data");
+          return;
+        }
+        
+        // Format data for display
+        const participants = attendanceData.map(record => ({
+          id: record.user_id,
+          name: record.profiles?.username || record.profiles?.full_name || "Anonymous User",
+          joinTime: new Date(record.join_time).toLocaleTimeString(),
+          leaveTime: record.leave_time ? new Date(record.leave_time).toLocaleTimeString() : null
+        }));
+        
+        setMeeting({
+          id: meetingData.id,
+          meetingId: meetingData.meeting_id,
+          title: meetingData.title,
+          date: new Date(meetingData.created_at).toLocaleDateString(),
+          startTime: new Date(meetingData.created_at).toLocaleTimeString(),
+          endTime: undefined,
+          participants
+        });
+      } catch (error) {
+        console.error("Error fetching meeting data:", error);
+        toast.error("Failed to load meeting details");
+      } finally {
+        setIsLoading(false);
       }
-    }
-  }, [meetingId]);
+    };
+
+    fetchMeetingData();
+  }, [meetingId, navigate]);
   
   const calculateDuration = (joinTime: string, leaveTime: string | null) => {
     if (!leaveTime) return "Still present";
@@ -101,6 +163,16 @@ const AttendanceSingle = () => {
     navigate(-1);
   };
 
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8 text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading meeting data...</h1>
+        </div>
+      </Layout>
+    );
+  }
+
   if (!meeting) {
     return (
       <Layout>
@@ -148,16 +220,24 @@ const AttendanceSingle = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {meeting.participants.map((participant, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{participant.name}</TableCell>
-                    <TableCell>{participant.joinTime}</TableCell>
-                    <TableCell>{participant.leaveTime || "Still present"}</TableCell>
-                    <TableCell>
-                      {calculateDuration(participant.joinTime, participant.leaveTime)}
+                {meeting.participants.length > 0 ? (
+                  meeting.participants.map((participant, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{participant.name}</TableCell>
+                      <TableCell>{participant.joinTime}</TableCell>
+                      <TableCell>{participant.leaveTime || "Still present"}</TableCell>
+                      <TableCell>
+                        {calculateDuration(participant.joinTime, participant.leaveTime)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-4">
+                      No attendance records found for this meeting
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </div>
