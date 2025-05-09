@@ -22,6 +22,7 @@ export const useMeetingData = (meetingId: string | undefined) => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [meeting, setMeeting] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [attendanceRecordId, setAttendanceRecordId] = useState<string | null>(null);
 
   // Check authentication and fetch meeting
   useEffect(() => {
@@ -35,6 +36,7 @@ export const useMeetingData = (meetingId: string | undefined) => {
       if (!meetingId) return;
 
       try {
+        // First try to find by meeting_id
         const { data, error } = await supabase
           .from("meetings")
           .select("*")
@@ -43,14 +45,31 @@ export const useMeetingData = (meetingId: string | undefined) => {
           
         if (error || !data) {
           toast.error("Meeting not found");
-          navigate("/");
+          navigate("/meetings");
           return;
         }
         
         setMeeting(data);
         
+        // Check if user has already joined this meeting
+        const { data: existingAttendance, error: existingAttendanceError } = await supabase
+          .from("attendance")
+          .select("id, leave_time")
+          .eq("meeting_id", data.id)
+          .eq("user_id", user.id)
+          .order("join_time", { ascending: false })
+          .limit(1);
+          
+        if (!existingAttendanceError && existingAttendance && existingAttendance.length > 0) {
+          // If there's an existing record with leave_time null, use that record
+          if (existingAttendance[0].leave_time === null) {
+            setAttendanceRecordId(existingAttendance[0].id);
+            return;
+          }
+        }
+        
         // Insert attendance record
-        await supabase
+        const { data: newAttendance, error: insertError } = await supabase
           .from("attendance")
           .insert([{
             meeting_id: data.id,
@@ -58,6 +77,12 @@ export const useMeetingData = (meetingId: string | undefined) => {
             join_time: new Date().toISOString()
           }])
           .select();
+          
+        if (insertError) {
+          console.error("Error recording attendance:", insertError);
+        } else if (newAttendance && newAttendance.length > 0) {
+          setAttendanceRecordId(newAttendance[0].id);
+        }
           
       } catch (error) {
         console.error("Error fetching meeting:", error);
@@ -124,52 +149,40 @@ export const useMeetingData = (meetingId: string | undefined) => {
       })
       .subscribe();
       
-    // Record leave time when leaving the meeting
     return () => {
-      if (user && meeting) {
-        const updateAttendance = async () => {
-          try {
-            await supabase
-              .from("attendance")
-              .update({
-                leave_time: new Date().toISOString()
-              })
-              .eq("meeting_id", meeting.id)
-              .eq("user_id", user.id)
-              .is("leave_time", null);
-          } catch (error) {
-            console.error("Error updating attendance record:", error);
-          }
-        };
-        
-        updateAttendance();
-      }
-      
       // Clean up the subscription
       supabase.removeChannel(channel);
     };
   }, [meeting, user]);
 
-  return {
-    meeting,
-    participants,
-    messages,
-    setMessages,
-    leaveAttendance: async () => {
-      if (!user || !meeting) return;
-      
+  // Clean up - record leave time when leaving the meeting
+  const leaveAttendance = async () => {
+    if (user && meeting && attendanceRecordId) {
       try {
         await supabase
           .from("attendance")
           .update({
             leave_time: new Date().toISOString()
           })
-          .eq("meeting_id", meeting.id)
-          .eq("user_id", user.id)
-          .is("leave_time", null);
+          .eq("id", attendanceRecordId);
       } catch (error) {
         console.error("Error updating attendance record:", error);
       }
     }
+  };
+
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      leaveAttendance();
+    };
+  }, [meeting, user, attendanceRecordId]);
+
+  return {
+    meeting,
+    participants,
+    messages,
+    setMessages,
+    leaveAttendance
   };
 };

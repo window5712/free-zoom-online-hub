@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { Video, Calendar, Clock, User } from "lucide-react";
+import { Video, Calendar, Clock, User, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -42,7 +42,8 @@ const Meetings = () => {
       try {
         setLoading(true);
         
-        const { data, error } = await supabase
+        // Fetch both meetings created by the user and meetings they've attended
+        const { data: createdMeetings, error: createdError } = await supabase
           .from("meetings")
           .select(`
             id, 
@@ -57,11 +58,52 @@ const Meetings = () => {
           .eq("created_by", user.id)
           .order("created_at", { ascending: false });
           
-        if (error) throw error;
+        if (createdError) throw createdError;
+        
+        // Now get all meeting IDs where the user participated (via attendance records)
+        const { data: attendedRecords, error: attendedError } = await supabase
+          .from("attendance")
+          .select("meeting_id")
+          .eq("user_id", user.id);
+          
+        if (attendedError) throw attendedError;
+        
+        // Get unique meeting IDs from attendance records
+        const attendedMeetingIds = [...new Set(attendedRecords.map(r => r.meeting_id))];
+        
+        // If the user has attended meetings, fetch their details
+        let attendedMeetings: any[] = [];
+        if (attendedMeetingIds.length > 0) {
+          const { data: attendedMeetingsData, error: attendedMeetingsError } = await supabase
+            .from("meetings")
+            .select(`
+              id, 
+              meeting_id, 
+              title, 
+              description, 
+              created_by, 
+              is_private, 
+              scheduled_time, 
+              created_at
+            `)
+            .in("id", attendedMeetingIds)
+            .order("created_at", { ascending: false });
+            
+          if (attendedMeetingsError) throw attendedMeetingsError;
+          attendedMeetings = attendedMeetingsData || [];
+        }
+        
+        // Combine both lists, ensuring no duplicates (meetings created by user that they also attended)
+        const combinedMeetings = [...createdMeetings];
+        attendedMeetings.forEach(meeting => {
+          if (!combinedMeetings.some(m => m.id === meeting.id)) {
+            combinedMeetings.push(meeting);
+          }
+        });
         
         // Fetch attendance records for each meeting to get participant count
-        if (data) {
-          const meetingsWithParticipantCount = await Promise.all(data.map(async (meeting) => {
+        if (combinedMeetings.length > 0) {
+          const meetingsWithParticipantCount = await Promise.all(combinedMeetings.map(async (meeting) => {
             const { count } = await supabase
               .from("attendance")
               .select("*", { count: "exact", head: true })
@@ -74,6 +116,8 @@ const Meetings = () => {
           }));
           
           setMeetings(meetingsWithParticipantCount);
+        } else {
+          setMeetings([]);
         }
       } catch (error) {
         console.error("Error fetching meetings:", error);

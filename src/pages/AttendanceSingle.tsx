@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -51,17 +50,28 @@ const AttendanceSingle = () => {
       
       setIsLoading(true);
       try {
-        // Fetch meeting information
-        const { data: meetingData, error: meetingError } = await supabase
+        // First try to fetch by database ID
+        let { data: meetingData, error: meetingError } = await supabase
           .from("meetings")
           .select("*")
           .eq("id", meetingId)
           .single();
         
+        // If not found by ID, try to fetch by meeting_id
         if (meetingError || !meetingData) {
-          toast.error("Meeting not found");
-          navigate("/attendance");
-          return;
+          const { data: meetingByMeetingId, error: meetingByMeetingIdError } = await supabase
+            .from("meetings")
+            .select("*")
+            .eq("meeting_id", meetingId)
+            .single();
+            
+          if (meetingByMeetingIdError || !meetingByMeetingId) {
+            toast.error("Meeting not found");
+            navigate("/meetings");
+            return;
+          }
+          
+          meetingData = meetingByMeetingId;
         }
         
         // Fetch attendance records for this meeting
@@ -73,7 +83,7 @@ const AttendanceSingle = () => {
             leave_time, 
             user_id
           `)
-          .eq("meeting_id", meetingId);
+          .eq("meeting_id", meetingData.id);
           
         if (attendanceError) {
           console.error("Error fetching attendance:", attendanceError);
@@ -195,7 +205,7 @@ const AttendanceSingle = () => {
   };
 
   const handleBack = () => {
-    navigate(-1);
+    navigate("/meetings");
   };
 
   if (isLoading) {
@@ -213,7 +223,7 @@ const AttendanceSingle = () => {
       <Layout>
         <div className="container mx-auto px-4 py-8 text-center">
           <h1 className="text-2xl font-bold mb-4">Meeting not found</h1>
-          <Button onClick={() => navigate("/attendance")}>Back to Attendance</Button>
+          <Button onClick={() => navigate("/meetings")}>Back to Meetings</Button>
         </div>
       </Layout>
     );
