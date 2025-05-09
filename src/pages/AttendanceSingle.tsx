@@ -33,6 +33,11 @@ interface Meeting {
   participants: Participant[];
 }
 
+interface Profile {
+  username: string | null;
+  full_name: string | null;
+}
+
 const AttendanceSingle = () => {
   const { meetingId } = useParams();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
@@ -66,8 +71,7 @@ const AttendanceSingle = () => {
             id, 
             join_time, 
             leave_time, 
-            user_id,
-            profiles:user_id (username, full_name)
+            user_id
           `)
           .eq("meeting_id", meetingId);
           
@@ -77,13 +81,44 @@ const AttendanceSingle = () => {
           return;
         }
         
-        // Format data for display
-        const participants = attendanceData.map(record => ({
-          id: record.user_id,
-          name: record.profiles?.username || record.profiles?.full_name || "Anonymous User",
-          joinTime: new Date(record.join_time).toLocaleTimeString(),
-          leaveTime: record.leave_time ? new Date(record.leave_time).toLocaleTimeString() : null
-        }));
+        // Get unique user IDs from attendance records
+        const userIds = attendanceData.map(record => record.user_id);
+        
+        // Fetch user profiles separately
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, username, full_name")
+          .in("id", userIds);
+        
+        if (profilesError) {
+          console.error("Error fetching profiles:", profilesError);
+          toast.error("Failed to load user profiles");
+          return;
+        }
+        
+        // Create a user profile lookup map
+        const profileMap: Record<string, Profile> = {};
+        profilesData?.forEach(profile => {
+          profileMap[profile.id] = {
+            username: profile.username,
+            full_name: profile.full_name
+          };
+        });
+        
+        // Format data for display with profile information
+        const participants = attendanceData.map(record => {
+          const profile = profileMap[record.user_id];
+          const displayName = profile 
+            ? (profile.username || profile.full_name || "Anonymous User")
+            : "Anonymous User";
+            
+          return {
+            id: record.user_id,
+            name: displayName,
+            joinTime: new Date(record.join_time).toLocaleTimeString(),
+            leaveTime: record.leave_time ? new Date(record.leave_time).toLocaleTimeString() : null
+          };
+        });
         
         setMeeting({
           id: meetingData.id,
