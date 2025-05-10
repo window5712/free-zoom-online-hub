@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import MeetingSidebar from "@/components/meeting/MeetingSidebar";
 import MeetingMobileDialogs from "@/components/meeting/MeetingMobileDialogs";
 import MeetingHeader from "@/components/meeting/MeetingHeader";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 const MeetingRoom = () => {
   const { meetingId } = useParams();
@@ -46,11 +47,29 @@ const MeetingRoom = () => {
     toggleAudio,
     toggleVideo,
     toggleScreenShare,
-    mediaStream
+    mediaStream,
+    retryMediaAccess
   } = useMeetingMedia();
 
   // Use the WebRTC hook to establish peer connections
-  const { participantStreams } = useWebRTC(meetingId, user, mediaStream);
+  const { participantStreams, connectionStates } = useWebRTC(meetingId, user, mediaStream);
+
+  // Track media connection issues
+  useEffect(() => {
+    if (mediaStream === null) {
+      toast.warning(
+        "Media access not available", 
+        { 
+          description: "Please check your camera and microphone permissions.", 
+          duration: 5000,
+          action: {
+            label: "Retry",
+            onClick: retryMediaAccess
+          }
+        }
+      );
+    }
+  }, [mediaStream]);
 
   const endCall = async () => {
     await leaveAttendance();
@@ -63,7 +82,7 @@ const MeetingRoom = () => {
       <Layout className="bg-zoom-gray">
         <div className="container mx-auto px-4 py-6 flex flex-col h-[calc(100vh-4rem)]">
           <div className="flex items-center justify-center h-full">
-            <p>Loading meeting...</p>
+            <p className="text-lg">Loading meeting...</p>
           </div>
         </div>
       </Layout>
@@ -92,6 +111,8 @@ const MeetingRoom = () => {
               screenVideoRef={screenVideoRef}
               participants={participants}
               participantStreams={participantStreams}
+              connectionStates={connectionStates}
+              onRetryMedia={retryMediaAccess}
             />
           </div>
 

@@ -3,6 +3,8 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import MeetingParticipant from "@/components/MeetingParticipant";
 import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { RefreshCcw } from "lucide-react";
 
 interface VideoDisplayProps {
   isScreenSharing: boolean;
@@ -11,6 +13,8 @@ interface VideoDisplayProps {
   screenVideoRef: React.RefObject<HTMLVideoElement>;
   participants: Array<{id: string, name: string}>;
   participantStreams: Map<string, MediaStream>;
+  connectionStates?: Map<string, string>;
+  onRetryMedia?: () => void;
 }
 
 const VideoDisplay: React.FC<VideoDisplayProps> = ({
@@ -20,57 +24,79 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({
   screenVideoRef,
   participants,
   participantStreams,
+  connectionStates = new Map(),
+  onRetryMedia,
 }) => {
   const { user, profile } = useAuth();
 
+  // Calculate grid columns based on number of participants
+  const totalParticipants = participants.length + 1; // +1 for the current user
+  const gridColsClass = totalParticipants <= 1 
+    ? "grid-cols-1" 
+    : totalParticipants <= 4 
+      ? "grid-cols-2" 
+      : "grid-cols-3";
+
   return (
-    <div className="video-grid overflow-y-auto p-2">
+    <div className="flex flex-col h-full">
       {/* Screen share video */}
       {isScreenSharing && (
         <div className="video-container col-span-full mb-4">
-          <video ref={screenVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-          <div className="participant-name">Screen Share</div>
+          <video ref={screenVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          <div className="absolute bottom-0 left-0 bg-black bg-opacity-50 text-white px-2 py-1">
+            Screen Share
+          </div>
         </div>
       )}
       
-      {/* User's video */}
-      <div className="video-container">
-        <video 
-          ref={localVideoRef} 
-          autoPlay 
-          playsInline
-          muted 
-          className={cn("w-full h-full object-cover", !isVideoEnabled && "hidden")}
+      {/* Video grid */}
+      <div className={cn(
+        "grid gap-4 flex-grow", 
+        isScreenSharing ? "h-1/3" : "h-full",
+        gridColsClass
+      )}>
+        {/* User's video */}
+        <MeetingParticipant
+          name={profile?.username || user?.email || "You"}
+          isAudioMuted={false} // We don't show our own mute status
+          participantStream={localVideoRef.current?.srcObject as MediaStream}
+          className="relative"
         />
-        {!isVideoEnabled && (
-          <div className="w-full h-full flex items-center justify-center bg-gray-800">
-            <div className="w-16 h-16 rounded-full bg-zoom-blue flex items-center justify-center text-white text-xl font-semibold">
-              {profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'Y'}
-            </div>
-          </div>
-        )}
-        <div className="participant-name">
-          {profile?.username || user?.email || "You"} {!isVideoEnabled && "(Camera Off)"}
-        </div>
+        
+        {/* Participant videos */}
+        {participants.map((participant) => (
+          <MeetingParticipant 
+            key={participant.id} 
+            name={participant.name}
+            participantStream={participantStreams.get(participant.id)}
+            participantId={participant.id}
+            connectionState={connectionStates.get(participant.id)}
+          />
+        ))}
       </div>
-      
-      {/* Participant videos */}
-      {participants.map((participant) => (
-        <MeetingParticipant 
-          key={participant.id} 
-          name={participant.name}
-          participantStream={participantStreams.get(participant.id)}
-          participantId={participant.id}
-        />
-      ))}
       
       {/* If no participants have joined yet */}
       {participants.length === 0 && (
-        <div className="video-container flex items-center justify-center bg-gray-100">
-          <div className="text-center p-4">
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+          <div className="text-center p-4 bg-white bg-opacity-80 rounded-lg shadow-lg">
             <p className="text-lg font-medium text-gray-700">No other participants yet</p>
             <p className="text-sm text-gray-500 mt-2">Share the meeting link to invite others</p>
           </div>
+        </div>
+      )}
+      
+      {/* Connection retry button */}
+      {onRetryMedia && (
+        <div className="absolute top-4 right-4">
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={onRetryMedia}
+            className="flex items-center gap-2"
+          >
+            <RefreshCcw size={14} />
+            <span>Retry Connection</span>
+          </Button>
         </div>
       )}
     </div>
