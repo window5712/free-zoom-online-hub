@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-import { Participant, Message } from "@/hooks/useMeetingData";
+import { Participant, Message } from "@/types/meetingTypes";
 
 interface MeetingChatProps {
   messages: Message[];
