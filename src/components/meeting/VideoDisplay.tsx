@@ -10,6 +10,7 @@ interface VideoDisplayProps {
   localVideoRef: React.RefObject<HTMLVideoElement>;
   screenVideoRef: React.RefObject<HTMLVideoElement>;
   participants: Array<{id: string, name: string}>;
+  participantStreams: Map<string, MediaStream>;
 }
 
 const VideoDisplay: React.FC<VideoDisplayProps> = ({
@@ -18,6 +19,7 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({
   localVideoRef,
   screenVideoRef,
   participants,
+  participantStreams,
 }) => {
   const { user, profile } = useAuth();
 
@@ -26,7 +28,7 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({
       {/* Screen share video */}
       {isScreenSharing && (
         <div className="video-container col-span-full mb-4">
-          <video ref={screenVideoRef} autoPlay muted className="w-full h-full object-cover" />
+          <video ref={screenVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
           <div className="participant-name">Screen Share</div>
         </div>
       )}
@@ -36,6 +38,7 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({
         <video 
           ref={localVideoRef} 
           autoPlay 
+          playsInline
           muted 
           className={cn("w-full h-full object-cover", !isVideoEnabled && "hidden")}
         />
@@ -51,11 +54,13 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({
         </div>
       </div>
       
-      {/* Participant videos - only show real participants */}
+      {/* Participant videos */}
       {participants.map((participant) => (
         <MeetingParticipant 
           key={participant.id} 
-          name={participant.name} 
+          name={participant.name}
+          participantStream={participantStreams.get(participant.id)}
+          participantId={participant.id}
         />
       ))}
       

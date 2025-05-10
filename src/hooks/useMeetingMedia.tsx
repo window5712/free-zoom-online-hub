@@ -172,7 +172,8 @@ const useMeetingMedia = () => {
     screenVideoRef,
     toggleAudio,
     toggleVideo,
-    toggleScreenShare
+    toggleScreenShare,
+    mediaStream
   };
 };
 

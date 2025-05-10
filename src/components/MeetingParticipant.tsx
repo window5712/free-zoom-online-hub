@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { cn } from "@/lib/utils";
 import { MicOff } from "lucide-react";
 
@@ -7,22 +7,36 @@ interface MeetingParticipantProps {
   name: string;
   isAudioMuted?: boolean;
   className?: string;
+  participantStream?: MediaStream;
+  participantId?: string;
 }
 
 const MeetingParticipant = ({ 
   name, 
-  isAudioMuted = true, // Default to muted for now
+  isAudioMuted = true,
+  participantStream,
+  participantId,
   className 
 }: MeetingParticipantProps) => {
-  const [hasVideo, setHasVideo] = useState(false); // Default to no video
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const hasVideo = Boolean(participantStream);
   
+  // Attach the stream to the video element when it changes
+  React.useEffect(() => {
+    if (participantStream && videoRef.current) {
+      videoRef.current.srcObject = participantStream;
+    }
+  }, [participantStream]);
+
   return (
     <div className={cn("video-container", className)}>
       {hasVideo ? (
-        <img
-          src={`https://i.pravatar.cc/300?u=${name}`}
-          alt={`${name}'s video`}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
           className="w-full h-full object-cover"
+          data-participant-id={participantId}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-gray-800">

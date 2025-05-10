@@ -6,15 +6,18 @@ import { cn } from "@/lib/utils";
 import useMeetingMedia from "@/hooks/useMeetingMedia";
 import { useMeetingData } from "@/hooks/useMeetingData";
 import { useMeetingUI } from "@/hooks/useMeetingUI";
+import { useWebRTC } from "@/hooks/useWebRTC";
 import VideoDisplay from "@/components/meeting/VideoDisplay";
 import MeetingControls from "@/components/meeting/MeetingControls";
 import MeetingSidebar from "@/components/meeting/MeetingSidebar";
 import MeetingMobileDialogs from "@/components/meeting/MeetingMobileDialogs";
 import MeetingHeader from "@/components/meeting/MeetingHeader";
+import { useAuth } from "@/context/AuthContext";
 
 const MeetingRoom = () => {
   const { meetingId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const {
     meeting,
@@ -42,8 +45,12 @@ const MeetingRoom = () => {
     screenVideoRef,
     toggleAudio,
     toggleVideo,
-    toggleScreenShare
+    toggleScreenShare,
+    mediaStream
   } = useMeetingMedia();
+
+  // Use the WebRTC hook to establish peer connections
+  const { participantStreams } = useWebRTC(meetingId, user, mediaStream);
 
   const endCall = async () => {
     await leaveAttendance();
@@ -84,6 +91,7 @@ const MeetingRoom = () => {
               localVideoRef={localVideoRef}
               screenVideoRef={screenVideoRef}
               participants={participants}
+              participantStreams={participantStreams}
             />
           </div>
 
