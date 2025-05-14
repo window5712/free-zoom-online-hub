@@ -69,7 +69,30 @@ const MeetingRoom = () => {
         }
       );
     }
-  }, [mediaStream]);
+  }, [mediaStream, retryMediaAccess]);
+
+  // Track WebRTC connection issues
+  useEffect(() => {
+    if (mediaStream && participants.length > 0) {
+      const connectedCount = Array.from(connectionStates.values()).filter(
+        state => state === 'connected'
+      ).length;
+      
+      if (connectedCount === 0 && participants.length > 0) {
+        toast.warning(
+          "Connection issues detected", 
+          { 
+            description: "Having trouble connecting to other participants.", 
+            duration: 5000,
+            action: {
+              label: "Retry",
+              onClick: retryMediaAccess
+            }
+          }
+        );
+      }
+    }
+  }, [connectionStates, participants.length, mediaStream, retryMediaAccess]);
 
   const endCall = async () => {
     await leaveAttendance();
