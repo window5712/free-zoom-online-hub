@@ -1,9 +1,10 @@
 
 import React, { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { MicOff, Wifi, WifiOff } from "lucide-react";
+import { MicOff, Wifi, WifiOff, Video, VideoOff } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 
 interface MeetingParticipantProps {
   name: string;
@@ -56,6 +57,12 @@ const MeetingParticipant = ({
     participantStream.getVideoTracks().length > 0 && 
     participantStream.getVideoTracks()[0].enabled;
 
+  // Handle retry connection
+  const handleRetryConnection = () => {
+    // This would be implemented in a parent component
+    console.log('Retry connection requested for', participantId);
+  };
+
   return (
     <div className={cn(
       "relative rounded-lg overflow-hidden border", 
@@ -74,17 +81,37 @@ const MeetingParticipant = ({
             />
             {!videoEnabled && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-70">
-                <div className="w-16 h-16 rounded-full bg-zoom-blue flex items-center justify-center text-white text-xl font-semibold">
-                  {name.charAt(0).toUpperCase()}
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-16 h-16 rounded-full bg-zoom-blue flex items-center justify-center text-white text-xl font-semibold">
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-white text-sm">Video off</span>
                 </div>
               </div>
             )}
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-800">
-            <div className="w-16 h-16 rounded-full bg-zoom-blue flex items-center justify-center text-white text-xl font-semibold">
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800">
+            <div className="w-16 h-16 rounded-full bg-zoom-blue flex items-center justify-center text-white text-xl font-semibold mb-2">
               {name.charAt(0).toUpperCase()}
             </div>
+            {isFailed ? (
+              <div className="flex flex-col items-center">
+                <span className="text-white text-sm mb-2">Media unavailable</span>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-white/10 text-white hover:bg-white/20"
+                  onClick={handleRetryConnection}
+                >
+                  Retry connection
+                </Button>
+              </div>
+            ) : isConnecting ? (
+              <span className="text-white text-sm">Connecting...</span>
+            ) : (
+              <span className="text-white text-sm">No video</span>
+            )}
           </div>
         )}
       </AspectRatio>
@@ -93,6 +120,7 @@ const MeetingParticipant = ({
         <div className="flex items-center gap-1 text-sm">
           {name}
           {isAudioMuted && <MicOff size={14} className="opacity-80" />}
+          {!videoEnabled && <VideoOff size={14} className="opacity-80" />}
         </div>
         
         <div className="connection-status flex items-center">

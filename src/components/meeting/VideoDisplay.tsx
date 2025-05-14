@@ -4,8 +4,9 @@ import { cn } from "@/lib/utils";
 import MeetingParticipant from "@/components/MeetingParticipant";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, AlertCircle } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface VideoDisplayProps {
   isScreenSharing: boolean;
@@ -43,8 +44,33 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({
     state => state === 'connected'
   ).length;
 
+  // Check if we have a local media stream
+  const hasLocalStream = Boolean(localVideoRef.current?.srcObject);
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {/* Media Access Warning */}
+      {!hasLocalStream && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Media Access Not Available</AlertTitle>
+          <AlertDescription className="flex justify-between items-center">
+            <span>Please check your camera and microphone permissions.</span>
+            {onRetryMedia && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onRetryMedia}
+                className="flex items-center gap-2 ml-4"
+              >
+                <RefreshCcw size={14} />
+                <span>Retry</span>
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Screen share video */}
       {isScreenSharing && (
         <div className="video-container w-full mb-4 border border-gray-300 rounded-lg overflow-hidden">
@@ -74,7 +100,7 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({
           isAudioMuted={false} // We don't show our own mute status
           participantStream={localVideoRef.current?.srcObject as MediaStream}
           className="relative"
-          connectionState="connected" // Always show our own video as connected
+          connectionState={hasLocalStream ? "connected" : "failed"} // Show failed if no stream
         />
         
         {/* Participant videos */}

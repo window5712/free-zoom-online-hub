@@ -54,7 +54,7 @@ const MeetingRoom = () => {
   // Use the WebRTC hook to establish peer connections
   const { participantStreams, connectionStates } = useWebRTC(meetingId, user, mediaStream);
 
-  // Track media connection issues
+  // Track media connection issues and provide helpful messaging
   useEffect(() => {
     if (mediaStream === null) {
       toast.warning(
@@ -71,7 +71,7 @@ const MeetingRoom = () => {
     }
   }, [mediaStream, retryMediaAccess]);
 
-  // Track WebRTC connection issues
+  // Track WebRTC connection issues with improved messaging
   useEffect(() => {
     if (mediaStream && participants.length > 0) {
       const connectedCount = Array.from(connectionStates.values()).filter(
@@ -93,6 +93,12 @@ const MeetingRoom = () => {
       }
     }
   }, [connectionStates, participants.length, mediaStream, retryMediaAccess]);
+
+  // Handle reconnection attempts for browser permission changes
+  const handleRetryMedia = () => {
+    toast.info("Attempting to reconnect media devices...");
+    retryMediaAccess();
+  };
 
   const endCall = async () => {
     await leaveAttendance();
@@ -135,7 +141,7 @@ const MeetingRoom = () => {
               participants={participants}
               participantStreams={participantStreams}
               connectionStates={connectionStates}
-              onRetryMedia={retryMediaAccess}
+              onRetryMedia={handleRetryMedia}
             />
           </div>
 
@@ -164,7 +170,7 @@ const MeetingRoom = () => {
           setMessages={setMessages}
         />
 
-        {/* Control bar */}
+        {/* Control bar with improved media controls */}
         <MeetingControls 
           isAudioEnabled={isAudioEnabled}
           isVideoEnabled={isVideoEnabled}
