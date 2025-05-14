@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { MicOff, Wifi, WifiOff } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MeetingParticipantProps {
   name: string;
@@ -95,9 +96,38 @@ const MeetingParticipant = ({
         </div>
         
         <div className="connection-status flex items-center">
-          {isFailed && <WifiOff size={14} className="text-red-400" title="Connection failed" />}
-          {isConnecting && <Wifi size={14} className="text-yellow-400" title="Connecting..." />}
-          {isConnected && <Wifi size={14} className="text-green-400" title="Connected" />}
+          <TooltipProvider>
+            {isFailed && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <WifiOff size={14} className="text-red-400" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Connection failed</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {isConnecting && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Wifi size={14} className="text-yellow-400" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Connecting...</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {isConnected && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Wifi size={14} className="text-green-400" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Connected</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </TooltipProvider>
         </div>
       </div>
     </div>
